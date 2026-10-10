@@ -235,6 +235,45 @@
 </section>
 
 <section>
+  <h2>云端同步</h2>
+  <p class="foot-note" style="margin:0 0 10px;">改动会<b>自动存进这台设备的浏览器</b>，刷新、关掉再打开都还在。如果填了 GitHub Token，还会<b>自动同步到你的 GitHub 仓库</b>，换一台设备（手机/别的电脑）打开也是最新记录。</p>
+  <div class="toolbar">
+    <button class="primary" id="btnSyncNow">立即同步</button>
+    <button id="btnCloudPull">从云端读取</button>
+    <button id="btnCloudPush">上传到云端</button>
+    <button class="small" id="btnSyncSettings">同步设置</button>
+    <span id="syncStatus" class="foot-note" style="margin:0;"></span>
+  </div>
+
+  <div id="syncSettings" style="display:none; border:1px solid var(--rule); background:#fffdf7; padding:12px 14px; border-radius:3px; margin-top:12px;">
+    <p class="foot-note" style="margin:0 0 10px;">读取云端不需要 Token（仓库是公开的）。<b>写入云端</b>需要一次 Token，它只存在这台设备的浏览器里，不会写进公开的网页文件。</p>
+    <p class="foot-note" style="margin:0 0 10px;">生成方法：GitHub 头像 → Settings → Developer settings → Personal access tokens → <b>Fine-grained tokens</b> → Generate new token → <b>Repository access</b> 只勾这一个仓库 → <b>Permissions → Contents</b> 选 <b>Read and write</b> → 生成后复制 <code>github_pat_…</code>。</p>
+    <div style="display:grid; grid-template-columns:88px 1fr; gap:8px 10px; align-items:center; max-width:660px;">
+      <label for="cfgToken" style="font-size:12.5px; font-weight:600;">Token</label>
+      <input id="cfgToken" type="password" autocomplete="off" placeholder="github_pat_…" style="font:inherit; font-size:12.5px; padding:5px; width:100%; box-sizing:border-box;">
+      <label for="cfgOwner" style="font-size:12.5px; font-weight:600;">用户名</label>
+      <input id="cfgOwner" type="text" autocomplete="off" style="font:inherit; font-size:12.5px; padding:5px; width:100%; box-sizing:border-box;">
+      <label for="cfgRepo" style="font-size:12.5px; font-weight:600;">仓库名</label>
+      <input id="cfgRepo" type="text" autocomplete="off" style="font:inherit; font-size:12.5px; padding:5px; width:100%; box-sizing:border-box;">
+      <label for="cfgBranch" style="font-size:12.5px; font-weight:600;">分支</label>
+      <input id="cfgBranch" type="text" autocomplete="off" style="font:inherit; font-size:12.5px; padding:5px; width:100%; box-sizing:border-box;">
+      <label for="cfgPath" style="font-size:12.5px; font-weight:600;">文件路径</label>
+      <input id="cfgPath" type="text" autocomplete="off" style="font:inherit; font-size:12.5px; padding:5px; width:100%; box-sizing:border-box;">
+      <label style="font-size:12.5px; font-weight:600;">自动</label>
+      <div>
+        <label style="font-size:12.5px;"><input type="checkbox" id="cfgAutoPull"> 打开时读取云端</label>
+        <label style="font-size:12.5px; margin-left:16px;"><input type="checkbox" id="cfgAutoPush"> 改动后自动上传</label>
+      </div>
+    </div>
+    <div class="toolbar" style="margin-top:12px;">
+      <button class="primary" id="btnCfgSave">保存设置</button>
+      <button id="btnCfgClearToken">清除 Token</button>
+      <span id="cfgStatus" class="foot-note" style="margin:0;"></span>
+    </div>
+  </div>
+</section>
+
+<section>
   <h2>排班表</h2>
   <div style="overflow-x:auto;">
   <table class="sched">
@@ -727,6 +766,336 @@ document.getElementById('fileImport').addEventListener('change', (e)=>{
 });
 
 render();
+
+/* ---------- 存档：本机自动保存 + GitHub 云端同步 ---------- */
+const LS_STATE = 'dutySchedule.state.v1';
+const LS_CFG   = 'dutySchedule.cloud.v1';
+const GH_API   = 'https://api.github.com';
+
+let dataStamp = new Date().toISOString();  // 逻辑修改时间：只有数据真的变了才更新
+let cloudSha  = null;                      // 云端文件当前 sha
+let pushTimer = null;
+let lastKey   = null;
+
+function detectRepo(){
+  const host = location.hostname || '';
+  if(!/\.github\.io$/i.test(host)) return null;
+  const user = host.replace(/\.github\.io$/i, '');
+  const seg  = location.pathname.split('/').filter(Boolean)[0];
+  return {owner:user, repo: seg ? seg : host};
+}
+
+const cfg = (function(){
+  let saved = {};
+  try{ saved = JSON.parse(localStorage.getItem(LS_CFG) || '{}') || {}; }catch(e){ saved = {}; }
+  const auto = detectRepo() || {};
+  return {
+    owner:    saved.owner  || auto.owner || '',
+    repo:     saved.repo   || auto.repo  || '',
+    branch:   saved.branch || 'main',
+    path:     saved.path   || 'data.json',
+    token:    saved.token  || '',
+    autoPull: saved.autoPull === undefined ? true : !!saved.autoPull,
+    autoPush: saved.autoPush === undefined ? true : !!saved.autoPush
+  };
+})();
+
+function isCloudReady(){ return !!(cfg.owner && cfg.repo); }
+
+function snapshot(){
+  return {
+    v: 1,
+    app: '值班排班簿',
+    updatedAt: dataStamp,
+    groupA: GROUP_A.slice(),
+    groupB: GROUP_B.slice(),
+    assignments: JSON.parse(JSON.stringify(assignments)),
+    lockState: Object.assign({}, lockState)
+  };
+}
+
+function stateKey(){
+  return JSON.stringify({a:GROUP_A, b:GROUP_B, w:assignments, l:lockState});
+}
+
+function applySnapshot(d){
+  if(!d || typeof d !== 'object') return false;
+  if(Array.isArray(d.groupA) && d.groupA.length) GROUP_A = d.groupA.map(String);
+  if(Array.isArray(d.groupB) && d.groupB.length) GROUP_B = d.groupB.map(String);
+  rebuildPeople();
+  if(d.assignments && typeof d.assignments === 'object'){
+    assignments = {};
+    WEEKS.forEach(w=>{
+      const src = d.assignments[w.id] || d.assignments[String(w.id)] || {};
+      const out = {};
+      Object.keys(src).forEach(f=>{
+        const e = src[f];
+        if(!e) return;
+        if(typeof e === 'string') out[f] = {name:e, forced:false, forcedReason:''};
+        else if(e.name) out[f] = {name:String(e.name), forced:!!e.forced, forcedReason:e.forcedReason || ''};
+      });
+      assignments[w.id] = out;
+    });
+  }
+  const ls = d.lockState || {};
+  lockState = {};
+  WEEKS.forEach(w=>{
+    const k = Object.prototype.hasOwnProperty.call(ls, w.id) ? w.id : String(w.id);
+    lockState[w.id] = Object.prototype.hasOwnProperty.call(ls, k) ? !!ls[k] : !!w.locked;
+  });
+  dataStamp = d.updatedAt || new Date().toISOString();
+  render();
+  lastKey = stateKey();
+  return true;
+}
+
+/* ----- 本机存档 ----- */
+function saveLocal(){
+  try{ localStorage.setItem(LS_STATE, JSON.stringify(snapshot())); }catch(e){}
+}
+function loadLocal(){
+  let raw = null;
+  try{ raw = localStorage.getItem(LS_STATE); }catch(e){ return false; }
+  if(!raw) return false;
+  try{ return applySnapshot(JSON.parse(raw)); }catch(e){ return false; }
+}
+
+/* ----- 状态提示 ----- */
+function setStatus(msg, kind){
+  const el = document.getElementById('syncStatus');
+  if(!el) return;
+  el.textContent = msg;
+  el.style.color = kind === 'err' ? 'var(--warn)' : (kind === 'ok' ? 'var(--teal)' : 'var(--ink-soft)');
+}
+function clockOf(){ return new Date().toLocaleTimeString('zh-CN', {hour12:false}); }
+function fullTime(ts){ return ts ? new Date(ts).toLocaleString('zh-CN', {hour12:false}) : '未知时间'; }
+
+/* ----- base64 <-> UTF-8 ----- */
+function b64encode(str){
+  const bytes = new TextEncoder().encode(str);
+  let bin = '';
+  for(let i=0;i<bytes.length;i++) bin += String.fromCharCode(bytes[i]);
+  return btoa(bin);
+}
+function b64decode(b64){
+  const bin = atob(String(b64).replace(/\s/g,''));
+  const bytes = new Uint8Array(bin.length);
+  for(let i=0;i<bin.length;i++) bytes[i] = bin.charCodeAt(i);
+  return new TextDecoder().decode(bytes);
+}
+
+/* ----- GitHub API ----- */
+function apiUrl(){
+  const p = cfg.path.split('/').map(encodeURIComponent).join('/');
+  return GH_API + '/repos/' + encodeURIComponent(cfg.owner) + '/' + encodeURIComponent(cfg.repo) + '/contents/' + p;
+}
+function apiHeaders(){
+  const h = {'Accept':'application/vnd.github+json','X-GitHub-Api-Version':'2022-11-28'};
+  if(cfg.token) h['Authorization'] = 'Bearer ' + cfg.token;
+  return h;
+}
+function explain(res){
+  if(res.status === 401) return 'Token 无效或已过期（401）';
+  if(res.status === 403) return '被 GitHub 拒绝（403）：可能 Token 权限不足，或请求次数超限';
+  if(res.status === 404) return '找不到仓库或文件（404）：请检查用户名、仓库名、分支';
+  if(res.status === 409 || res.status === 422) return '版本冲突（' + res.status + '）：云端刚被别的设备改过';
+  return 'HTTP ' + res.status;
+}
+async function cloudGet(){
+  const r = await fetch(apiUrl() + '?ref=' + encodeURIComponent(cfg.branch) + '&t=' + Date.now(),
+                        {headers: apiHeaders(), cache: 'no-store'});
+  if(r.status === 404) return null;
+  if(!r.ok) throw new Error(explain(r));
+  const j = await r.json();
+  let data;
+  try{ data = JSON.parse(b64decode(j.content || '')); }
+  catch(e){ throw new Error('云端文件不是有效的 JSON'); }
+  return {sha: j.sha, data: data};
+}
+async function cloudPut(data, sha){
+  const body = {
+    message: '排班同步 ' + new Date().toLocaleString('zh-CN'),
+    content: b64encode(JSON.stringify(data, null, 2)),
+    branch: cfg.branch
+  };
+  if(sha) body.sha = sha;
+  const r = await fetch(apiUrl(), {
+    method: 'PUT',
+    headers: Object.assign({'Content-Type':'application/json'}, apiHeaders()),
+    body: JSON.stringify(body)
+  });
+  if(!r.ok) throw new Error(explain(r));
+  const j = await r.json();
+  return j && j.content ? j.content.sha : null;
+}
+
+/* ----- 同步动作 ----- */
+async function cloudPush(){
+  if(!isCloudReady()) throw new Error('还没设置 GitHub 仓库，请点「同步设置」填写');
+  if(!cfg.token) throw new Error('写入需要 GitHub Token，请点「同步设置」填写');
+  if(!cloudSha){
+    const cur = await cloudGet().catch(()=>null);
+    cloudSha = cur ? cur.sha : null;
+  }
+  let newSha;
+  try{
+    newSha = await cloudPut(snapshot(), cloudSha);
+  }catch(err){
+    if(!/版本冲突/.test(err.message)) throw err;
+    const cur = await cloudGet();
+    if(!cur) throw err;
+    const rT = Date.parse((cur.data && cur.data.updatedAt) || '') || 0;
+    const lT = Date.parse(dataStamp) || 0;
+    if(rT > lT) throw new Error('云端有更新的记录，请改用「从云端读取」，以免覆盖');
+    newSha = await cloudPut(snapshot(), cur.sha);
+  }
+  cloudSha = newSha;
+  return true;
+}
+
+async function pullFromCloud(force){
+  if(!isCloudReady()) throw new Error('还没设置 GitHub 仓库，请点「同步设置」填写');
+  const remote = await cloudGet();
+  if(!remote){ setStatus('云端还没有存档文件', 'err'); return false; }
+  cloudSha = remote.sha;
+  const rT = Date.parse((remote.data && remote.data.updatedAt) || '') || 0;
+  const lT = Date.parse(dataStamp) || 0;
+  if(force || rT > lT){
+    applySnapshot(remote.data);
+    saveLocal();
+    setStatus('已读取云端记录（' + fullTime(rT) + '）', 'ok');
+    return true;
+  }
+  setStatus('云端没有更新的记录（云端 ' + fullTime(rT) + '）', 'ok');
+  return false;
+}
+
+async function syncNow(){
+  setStatus('正在同步…');
+  try{
+    if(!isCloudReady()) throw new Error('还没设置 GitHub 仓库，请点「同步设置」填写');
+    const remote = await cloudGet();
+    if(!remote){
+      if(!cfg.token) throw new Error('云端还没有存档，且没填 Token 无法创建');
+      cloudSha = null;
+      await cloudPush();
+      setStatus('已创建云端存档 ' + clockOf(), 'ok');
+      return;
+    }
+    cloudSha = remote.sha;
+    const rT = Date.parse((remote.data && remote.data.updatedAt) || '') || 0;
+    const lT = Date.parse(dataStamp) || 0;
+    if(rT > lT){
+      applySnapshot(remote.data);
+      saveLocal();
+      setStatus('已更新为云端记录（' + fullTime(rT) + '）', 'ok');
+    }else if(lT > rT){
+      await cloudPush();
+      setStatus('已上传到云端 ' + clockOf(), 'ok');
+    }else{
+      setStatus('两边一致，无需同步', 'ok');
+    }
+  }catch(e){
+    setStatus('同步失败：' + e.message, 'err');
+  }
+}
+
+function schedulePush(){
+  if(!cfg.autoPush || !cfg.token) return;
+  if(pushTimer) clearTimeout(pushTimer);
+  pushTimer = setTimeout(async ()=>{
+    pushTimer = null;
+    try{
+      await cloudPush();
+      setStatus('已同步到云端 ' + clockOf(), 'ok');
+    }catch(e){
+      setStatus('上传失败：' + e.message, 'err');
+    }
+  }, 2500);
+}
+
+function checkDirty(){
+  const k = stateKey();
+  if(k === lastKey) return;
+  lastKey = k;
+  dataStamp = new Date().toISOString();
+  saveLocal();
+  setStatus('本机已保存 ' + clockOf());
+  schedulePush();
+}
+
+/* ----- 界面 ----- */
+function bindSyncUI(){
+  const $ = id => document.getElementById(id);
+  $('btnSyncNow').addEventListener('click', syncNow);
+  $('btnCloudPull').addEventListener('click', async ()=>{
+    setStatus('正在读取云端…');
+    try{ await pullFromCloud(true); }catch(e){ setStatus('读取失败：' + e.message, 'err'); }
+  });
+  $('btnCloudPush').addEventListener('click', async ()=>{
+    setStatus('正在上传…');
+    try{ await cloudPush(); setStatus('已上传到云端 ' + clockOf(), 'ok'); }
+    catch(e){ setStatus('上传失败：' + e.message, 'err'); }
+  });
+  $('btnSyncSettings').addEventListener('click', ()=>{
+    const p = $('syncSettings');
+    const show = p.style.display === 'none';
+    p.style.display = show ? 'block' : 'none';
+    if(show){
+      $('cfgToken').value  = cfg.token;
+      $('cfgOwner').value  = cfg.owner;
+      $('cfgRepo').value   = cfg.repo;
+      $('cfgBranch').value = cfg.branch;
+      $('cfgPath').value   = cfg.path;
+      $('cfgAutoPull').checked = cfg.autoPull;
+      $('cfgAutoPush').checked = cfg.autoPush;
+      $('cfgStatus').textContent = '';
+    }
+  });
+  $('btnCfgSave').addEventListener('click', ()=>{
+    cfg.token    = $('cfgToken').value.trim();
+    cfg.owner    = $('cfgOwner').value.trim();
+    cfg.repo     = $('cfgRepo').value.trim();
+    cfg.branch   = $('cfgBranch').value.trim() || 'main';
+    cfg.path     = $('cfgPath').value.trim() || 'data.json';
+    cfg.autoPull = $('cfgAutoPull').checked;
+    cfg.autoPush = $('cfgAutoPush').checked;
+    try{ localStorage.setItem(LS_CFG, JSON.stringify(cfg)); }catch(e){}
+    $('cfgStatus').textContent = '已保存。';
+    setStatus('设置已保存', 'ok');
+  });
+  $('btnCfgClearToken').addEventListener('click', ()=>{
+    cfg.token = '';
+    try{ localStorage.setItem(LS_CFG, JSON.stringify(cfg)); }catch(e){}
+    $('cfgToken').value = '';
+    $('cfgStatus').textContent = 'Token 已从这台设备清除。';
+  });
+}
+
+/* ----- 启动 ----- */
+(function initSync(){
+  const hadLocal = loadLocal();
+  if(!hadLocal) dataStamp = '1970-01-01T00:00:00.000Z';  // 本机没记录时，让云端记录优先
+  lastKey = stateKey();
+  bindSyncUI();
+  document.getElementById('syncSettings').style.display = 'none';
+
+  if(cfg.token) setStatus('已启用云端同步' + (hadLocal ? '（已恢复本机记录）' : ''));
+  else setStatus(hadLocal ? '已恢复本机记录 ' + fullTime(Date.parse(dataStamp)) : '改动会自动保存在本机');
+
+  setInterval(checkDirty, 800);
+  window.addEventListener('beforeunload', checkDirty);
+  document.addEventListener('visibilitychange', ()=>{ if(document.hidden) checkDirty(); });
+
+  setTimeout(async ()=>{
+    if(!cfg.autoPull || !isCloudReady()) return;
+    if(cfg.token){
+      await syncNow();                                  // 双向：谁新用谁
+    }else if(!hadLocal){
+      try{ await pullFromCloud(false); }catch(e){}      // 没 Token 也能读公开仓库
+    }
+  }, 400);
+})();
 </script>
 </body>
 </html>
