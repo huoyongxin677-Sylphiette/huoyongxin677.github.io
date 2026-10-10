@@ -1,0 +1,255 @@
+{
+  "v": 1,
+  "app": "值班排班簿",
+  "updatedAt": "2026-10-10T03:50:05.711Z",
+  "groupA": [
+    "陈心园",
+    "范梓涵",
+    "何彦",
+    "霍俊轩",
+    "刘豪",
+    "严汉云",
+    "黄启乐",
+    "叶颖仪",
+    "周思彤",
+    "王佳慧",
+    "王铭轩",
+    "陈凌哲"
+  ],
+  "groupB": [
+    "袁丽珠",
+    "黄方迪",
+    "李可",
+    "韩钰婷",
+    "何伊淇",
+    "魏子欣",
+    "陈泽仪",
+    "文婧茹",
+    "唐婷婷",
+    "罗文慧",
+    "古远滕",
+    "李静雯"
+  ],
+  "assignments": {
+    "1": {
+      "2": {
+        "name": "李静雯",
+        "forced": false,
+        "forcedReason": ""
+      },
+      "3": {
+        "name": "严汉云",
+        "forced": false,
+        "forcedReason": ""
+      },
+      "4": {
+        "name": "陈泽仪",
+        "forced": false,
+        "forcedReason": ""
+      },
+      "5": {
+        "name": "古远滕",
+        "forced": false,
+        "forcedReason": ""
+      },
+      "6": {
+        "name": "韩钰婷",
+        "forced": false,
+        "forcedReason": ""
+      }
+    },
+    "2": {
+      "2": {
+        "name": "罗文慧",
+        "forced": false,
+        "forcedReason": ""
+      },
+      "3": {
+        "name": "霍俊轩",
+        "forced": false,
+        "forcedReason": ""
+      },
+      "4": {
+        "name": "陈凌哲",
+        "forced": false,
+        "forcedReason": ""
+      },
+      "5": {
+        "name": "范梓涵",
+        "forced": false,
+        "forcedReason": ""
+      },
+      "6": {
+        "name": "黄启乐",
+        "forced": false,
+        "forcedReason": ""
+      }
+    },
+    "3": {
+      "2": {
+        "name": "袁丽珠",
+        "forced": false,
+        "forcedReason": "（手动指定）"
+      },
+      "3": {
+        "name": "王佳慧",
+        "forced": false,
+        "forcedReason": "（手动指定）"
+      },
+      "4": {
+        "name": "刘豪",
+        "forced": false,
+        "forcedReason": "（手动指定）"
+      },
+      "5": {
+        "name": "李可",
+        "forced": false,
+        "forcedReason": "（手动指定）"
+      },
+      "6": {
+        "name": "周思彤",
+        "forced": false,
+        "forcedReason": "（手动指定）"
+      }
+    },
+    "4": {
+      "2": {
+        "name": "王铭轩",
+        "forced": false,
+        "forcedReason": "（手动指定）"
+      },
+      "3": {
+        "name": "文婧茹",
+        "forced": false,
+        "forcedReason": "（手动指定）"
+      },
+      "4": {
+        "name": "唐婷婷",
+        "forced": false,
+        "forcedReason": "（手动指定）"
+      },
+      "5": {
+        "name": "叶颖仪",
+        "forced": false,
+        "forcedReason": "（手动指定）"
+      },
+      "6": {
+        "name": "何伊淇",
+        "forced": false,
+        "forcedReason": "（手动指定）"
+      }
+    },
+    "5": {
+      "2": {
+        "name": "陈心园",
+        "forced": false,
+        "forcedReason": "（手动指定）"
+      },
+      "3": {
+        "name": "魏子欣",
+        "forced": false,
+        "forcedReason": "（手动指定）"
+      },
+      "4": {
+        "name": "黄方迪",
+        "forced": false,
+        "forcedReason": "（手动指定）"
+      },
+      "5": {
+        "name": "韩钰婷",
+        "forced": true,
+        "forcedReason": "同月尽量只排一次：韩钰婷 在9月已经值过班了（第1周）"
+      },
+      "6": {
+        "name": "何彦",
+        "forced": false,
+        "forcedReason": "（手动指定）"
+      }
+    },
+    "6": {
+      "2": {
+        "name": "陈心园",
+        "forced": true,
+        "forcedReason": "楼层不重复：陈心园 在第5周（9.28–10.2）已经值过2楼；值班间隔太近：陈心园 距上次值班（第5周）只隔了1周，一般要求隔2-3周"
+      },
+      "3": {
+        "name": "魏子欣",
+        "forced": true,
+        "forcedReason": "楼层不重复：魏子欣 在第5周（9.28–10.2）已经值过3楼；值班间隔太近：魏子欣 距上次值班（第5周）只隔了1周，一般要求隔2-3周"
+      },
+      "4": {
+        "name": "黄方迪",
+        "forced": true,
+        "forcedReason": "楼层不重复：黄方迪 在第5周（9.28–10.2）已经值过4楼；值班间隔太近：黄方迪 距上次值班（第5周）只隔了1周，一般要求隔2-3周"
+      },
+      "5": {
+        "name": "韩钰婷",
+        "forced": true,
+        "forcedReason": "楼层不重复：韩钰婷 在第5周（9.28–10.2）已经值过5楼；值班间隔太近：韩钰婷 距上次值班（第5周）只隔了1周，一般要求隔2-3周"
+      },
+      "6": {
+        "name": "何彦",
+        "forced": true,
+        "forcedReason": "楼层不重复：何彦 在第5周（9.28–10.2）已经值过6楼；值班间隔太近：何彦 距上次值班（第5周）只隔了1周，一般要求隔2-3周"
+      }
+    },
+    "7": {
+      "2": {
+        "name": "韩钰婷",
+        "forced": true,
+        "forcedReason": "值班间隔太近：韩钰婷 距上次值班（第6周）只隔了1周，一般要求隔2-3周；同月尽量只排一次：韩钰婷 在10月已经值过班了（第6周）"
+      },
+      "3": {
+        "name": "周思彤",
+        "forced": false,
+        "forcedReason": "（手动指定）"
+      },
+      "4": {
+        "name": "李可",
+        "forced": false,
+        "forcedReason": "（手动指定）"
+      },
+      "5": {
+        "name": "陈心园",
+        "forced": true,
+        "forcedReason": "值班间隔太近：陈心园 距上次值班（第6周）只隔了1周，一般要求隔2-3周；同月尽量只排一次：陈心园 在10月已经值过班了（第6周）"
+      },
+      "6": {
+        "name": "李静雯",
+        "forced": false,
+        "forcedReason": "（手动指定）"
+      }
+    },
+    "8": {},
+    "9": {},
+    "10": {},
+    "11": {},
+    "12": {},
+    "13": {},
+    "14": {},
+    "15": {},
+    "16": {},
+    "17": {},
+    "18": {}
+  },
+  "lockState": {
+    "1": true,
+    "2": true,
+    "3": false,
+    "4": true,
+    "5": false,
+    "6": false,
+    "7": false,
+    "8": false,
+    "9": false,
+    "10": false,
+    "11": false,
+    "12": false,
+    "13": false,
+    "14": false,
+    "15": false,
+    "16": false,
+    "17": false,
+    "18": false
+  }
+}
